@@ -67,6 +67,9 @@
         ],
         "post-update-cmd": [
             "@auto-scripts"
+        ],
+        "phpstan": [
+            "phpstan analyse"
         ]
     },
     "conflict": {
@@ -80,6 +83,6 @@
     },
     "require-dev": {
         "doctrine/doctrine-fixtures-bundle": "^4.3.1",
-        "phpstan/phpstan": "^2.1.47"
+        "phpstan/phpstan": "^2.1"
     }
 }

@@ -1,0 +1,21 @@
+parameters:
+    level: 6
+
+    paths:
+        - src
+
+    reportUnmatchedIgnoredErrors: true
+    
+    inferPrivatePropertyTypeFromConstructor: true
+    
+    treatPhpDocTypesAsCertain: false
+
+    checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    checkUninitializedProperties: true
+    checkExplicitMixed: true
+    checkImplicitMixed: true
+
+    excludePaths:
+        analyse:
+            - var/*
+            - vendor/*
