@@ -1,0 +1,35 @@
+services:
+  backend:
+    build:
+      context: ../
+      dockerfile: docker/image/Dockerfile
+      target: dev
+      args:
+        APP_ENV: dev
+        USER_ID: ${UID:-1000}
+        GROUP_ID: ${GID:-1000}
+    environment:
+      APP_ENV: dev
+      APP_DEBUG: 1
+      COMPOSER_CACHE_DIR: /tmp/cache/composer
+    volumes:
+      - ./../:/var/www/html
+    ports:
+      - "9000:9000" # php-fpm
+      - "8000:8080" # nginx
+    user: "${UID:-1000}:${GID:-1000}"
+    command: >
+      sh -c "
+        set -e
+        cd /var/www/html
+        mkdir -p var public/data config/jwt
+        php-fpm -R &
+        nginx -g 'daemon off;'
+      "
+    networks:
+      - hydra_internal
+
+networks:
+  hydra_internal:
+    driver: bridge
+    external: true

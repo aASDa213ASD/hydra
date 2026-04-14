@@ -1,0 +1,14 @@
+.git
+.idea
+.vscode
+.env.local
+.env.test
+**/.DS_Store
+*.log
+node_modules
+vendor
+var
+tests
+coverage
+tmp
+log

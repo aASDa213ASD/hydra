@@ -1,0 +1,37 @@
+services:
+  backend:
+    image: hydra/backend:${BACKEND_VERSION:-latest}
+    container_name: hydra-backend
+    build:
+      context: ../
+      dockerfile: docker/image/Dockerfile
+      target: prod
+      args:
+          APP_ENV: prod
+    environment:
+      APP_ENV: prod
+      APP_DEBUG: 0
+    ports:
+      - "8000:8080"
+    volumes:
+      - var:/var/www/html/var
+      - jwt:/var/www/html/config/jwt
+      - storage:/var/www/html/public/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - hydra_internal
+    restart: unless-stopped
+
+volumes:
+  var: {}
+  jwt: {}
+  storage: {}
+
+networks:
+  hydra_internal:
+    driver: bridge
+    external: true
