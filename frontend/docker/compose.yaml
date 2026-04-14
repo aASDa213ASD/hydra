@@ -1,0 +1,27 @@
+services:
+  frontend:
+    image: hydra/frontend:${FRONTEND_VERSION:-latest}
+    container_name: hydra-frontend
+    build:
+      context: ../
+      dockerfile: docker/image/Dockerfile
+      target: prod
+      args:
+        NODE_VERSION: ${NODE_VERSION:-24-alpine}
+    environment:
+      NODE_ENV: production
+    networks:
+      - hydra_internal
+    ports:
+      - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+networks:
+  hydra_internal:
+    driver: bridge
+    external: true

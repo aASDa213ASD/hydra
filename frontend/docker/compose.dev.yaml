@@ -1,0 +1,32 @@
+services:
+  frontend:
+    build:
+        context: ../
+        dockerfile: docker/image/Dockerfile
+        target: dev
+        args:
+            NODE_VERSION: ${NODE_VERSION:-24-alpine}
+    environment:
+        NODE_ENV: development
+    volumes:
+      - ./../:/app
+    ports:
+      - "5173:5173"
+    command: >
+      sh -c "
+          cd /app
+          if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules)\" ]; then
+              npm ci --legacy-peer-deps
+          fi
+          npm run dev -- --host --port 5173
+      "
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:5173/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  hydra_internal:
+    driver: bridge
+    external: true
