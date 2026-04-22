@@ -10,19 +10,19 @@ function processUserData(user: User) {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(() =>
+    localStorage.getItem("jwt")
+  );
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => token !== null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("jwt");
     let clearSessionTimeout: number | null = null;
     let isMounted = true;
 
-    if (stored) {
-      setToken(stored);
+    if (token) {
       fetch(apiUrl("/api/v1/me"), {
-        headers: { Authorization: `Bearer ${stored}` },
+        headers: { Authorization: `Bearer ${token}` },
       })
         .then(async (res) => {
           if (!res.ok) {
@@ -47,8 +47,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(null);
           }, 500);
         });
-    } else {
-      setIsLoading(false);
     }
 
     return () => {
@@ -57,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.clearTimeout(clearSessionTimeout);
       }
     };
-  }, []);
+  }, [token]);
 
   const login = (newToken: string) => {
     localStorage.setItem("jwt", newToken);
@@ -90,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("jwt");
     setToken(null);
     setUser(null);
+    setIsLoading(false);
   };
 
   return (

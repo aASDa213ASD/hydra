@@ -4,6 +4,18 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
 @font-face {
   font-family: "WebPlus ToshibaSat 8x14";
   src: url("../../shared/assets/fonts/WebPlus_ToshibaSat_8x14.woff")

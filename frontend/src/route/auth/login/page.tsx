@@ -20,7 +20,7 @@ type LoginSession = {
 };
 
 const hostname = "hydra";
-const banner = `Kali GNU/Linux Rolling ${hostname} tty1`;
+const banner = `Hydra GNU/Linux Rolling ${hostname} tty1`;
 
 let lineSequence = 0;
 
@@ -136,6 +136,7 @@ export default function LoginPage() {
         prompt={session.prompt}
         value={session.input}
         inputMode={session.mode}
+        noEcho={session.mode === "password"}
         disabled={session.isSubmitting}
         showInput={!session.isSubmitting}
         className="min-h-screen border-0"

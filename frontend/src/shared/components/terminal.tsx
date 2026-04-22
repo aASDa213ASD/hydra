@@ -1,4 +1,10 @@
-import { type FormEvent, useEffect, useRef } from "react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -27,9 +33,11 @@ type TerminalProps = {
   value: string;
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
   username?: string;
   hostname?: string;
   inputMode?: "text" | "password";
+  noEcho?: boolean;
   disabled?: boolean;
   showInput?: boolean;
   placeholder?: string;
@@ -42,7 +50,7 @@ function replacePlaceholders(
   {
     username = "guest",
     hostname = "terminal",
-  }: Pick<TerminalProps, "username" | "hostname">,
+  }: Pick<TerminalProps, "username" | "hostname">
 ) {
   return value
     .replaceAll("{{username}}", username)
@@ -51,16 +59,14 @@ function replacePlaceholders(
 
 function renderLine(
   line: TerminalLine,
-  replacements: Pick<TerminalProps, "username" | "hostname">,
+  replacements: Pick<TerminalProps, "username" | "hostname">
 ) {
   if (line.type === "command") {
     return (
       <p key={line.id} className="m-0 break-words">
         <span>{replacePlaceholders(line.prompt, replacements)}</span>{" "}
         <span>
-          {line.hidden
-            ? "*".repeat(Math.max(line.command.length, 8))
-            : replacePlaceholders(line.command, replacements)}
+          {line.hidden ? "" : replacePlaceholders(line.command, replacements)}
         </span>
       </p>
     );
@@ -87,9 +93,11 @@ export function Terminal({
   value,
   onChange,
   onSubmit,
+  onKeyDown,
   username,
   hostname,
   inputMode = "text",
+  noEcho = false,
   disabled = false,
   showInput = true,
   placeholder,
@@ -98,6 +106,17 @@ export function Terminal({
 }: TerminalProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [caretIndex, setCaretIndex] = useState(0);
+
+  function syncCaretIndex() {
+    const input = inputRef.current;
+    if (!input) {
+      return;
+    }
+
+    const index = input.selectionStart ?? value.length;
+    setCaretIndex(Math.max(0, Math.min(index, value.length)));
+  }
 
   useEffect(() => {
     if (autoFocus && !disabled) {
@@ -123,7 +142,7 @@ export function Terminal({
     <section
       className={cn(
         "w-full bg-black p-6 font-mono text-base text-white [-webkit-font-smoothing:none] [-moz-osx-font-smoothing:auto] [font-smooth:never] [text-rendering:geometricPrecision]",
-        className,
+        className
       )}
       onClick={() => inputRef.current?.focus()}
       aria-label="Terminal"
@@ -136,7 +155,30 @@ export function Terminal({
             <span className="shrink-0">
               {replacePlaceholders(prompt, { username, hostname })}
             </span>
-            <div className="min-w-0 flex-1">
+            <div
+              className="relative min-w-0 flex-1"
+              onClick={() => inputRef.current?.focus()}
+            >
+              <pre className="m-0 whitespace-pre-wrap break-words">
+                {noEcho || inputMode === "password" ? (
+                  <span className="inline-block h-[1em] w-[1ch] -mr-[1ch] align-middle bg-current opacity-70 mix-blend-difference animate-[caret-blink_1.0s_cubic-bezier(0,0,1,1)_infinite]" />
+                ) : (
+                  <>
+                    {value.length === 0 && placeholder ? (
+                      <>
+                        {placeholder}
+                        <span className="inline-block h-[1em] w-[1ch] -mr-[1ch] align-middle bg-current opacity-70 mix-blend-difference animate-[caret-blink_1.0s_cubic-bezier(0,0,1,1)_infinite]" />
+                      </>
+                    ) : (
+                      <>
+                        {value.slice(0, caretIndex)}
+                        <span className="inline-block h-[1em] w-[1ch] -mr-[1ch] align-middle bg-current opacity-70 mix-blend-difference animate-[caret-blink_1.0s_cubic-bezier(0,0,1,1)_infinite]" />
+                        {value.slice(caretIndex)}
+                      </>
+                    )}
+                  </>
+                )}
+              </pre>
               <label className="sr-only" htmlFor="terminal-input">
                 Terminal input
               </label>
@@ -144,15 +186,28 @@ export function Terminal({
                 id="terminal-input"
                 ref={inputRef}
                 value={value}
-                onChange={(event) => onChange(event.target.value)}
-                type={inputMode === "password" ? "password" : "text"}
+                onChange={(event) => {
+                  onChange(event.target.value);
+                  const index = event.target.selectionStart ?? 0;
+                  setCaretIndex(
+                    Math.max(0, Math.min(index, event.target.value.length))
+                  );
+                }}
+                onClick={syncCaretIndex}
+                onKeyDown={onKeyDown}
+                onKeyUp={syncCaretIndex}
+                onSelect={syncCaretIndex}
+                type="text"
                 autoComplete="off"
                 autoCapitalize="off"
                 autoCorrect="off"
                 spellCheck={false}
                 placeholder={placeholder}
                 disabled={disabled}
-                className="block w-full border-0 bg-transparent p-0 text-inherit outline-none [caret-color:white] [-webkit-appearance:none] [-webkit-font-smoothing:none] [-moz-osx-font-smoothing:auto] [font-smooth:never] [text-rendering:geometricPrecision]"
+                className={cn(
+                  "absolute inset-0 h-full w-full border-0 bg-transparent p-0 opacity-0 outline-none [-webkit-appearance:none]",
+                  disabled ? "pointer-events-none" : ""
+                )}
               />
             </div>
           </form>

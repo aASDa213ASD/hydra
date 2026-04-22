@@ -10,7 +10,7 @@ type ApiErrorResponse = {
 
 export async function loginWithPassword(
   name: string,
-  password: string,
+  password: string
 ): Promise<LoginResponse> {
   const res = await fetch(apiUrl("/api/v1/login"), {
     method: "POST",
@@ -24,7 +24,7 @@ export async function loginWithPassword(
     throw new Error(
       "error" in data && typeof data.error === "string"
         ? data.error
-        : "LOGIN_FAILED",
+        : "LOGIN_FAILED"
     );
   }
 

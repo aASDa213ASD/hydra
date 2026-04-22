@@ -1,29 +1,37 @@
-import { useEffect, useState } from "react";
+import { type KeyboardEvent, useMemo, useState } from "react";
 
 import { type TerminalLine } from "@/shared/components/terminal";
+
+type CommandOutput = {
+  stdout?: string | string[];
+  stderr?: string | string[];
+  clear?: boolean;
+};
+
+type CommandResult = string | string[] | CommandOutput | void;
+
+export type CommandDef = {
+  usage: string;
+  fn: (args: {
+    command: string;
+    raw: string;
+    argv: string[];
+  }) => CommandResult | Promise<CommandResult>;
+};
 
 type TerminalSessionState = {
   lines: TerminalLine[];
   input: string;
-  mode: "text" | "password";
-  prompt: string;
-  pendingLoginUser: string | null;
+  history: string[];
+  historyIndex: number | null;
 };
 
 type UseTerminalSessionOptions = {
   lastLoginAt?: string;
-  onExit?: () => void;
+  clientCommands?: Record<string, CommandDef>;
+  serverCommands?: Record<string, CommandDef>;
+  runServerCommand?: (raw: string) => CommandResult | Promise<CommandResult>;
 };
-
-const helpLines = [
-  "Available commands:",
-  "help            show available commands",
-  "whoami          print current username",
-  "exit            end terminal session",
-  "logout          end terminal session",
-  "login           start demo login flow",
-  "clear           clear terminal history",
-];
 
 let lineSequence = 0;
 
@@ -62,15 +70,13 @@ function createWelcomeLines(lastLoginAt?: string): TerminalLine[] {
 }
 
 function createInitialLines(lastLoginAt?: string): TerminalLine[] {
-  return [
-    ...createWelcomeLines(lastLoginAt),
-  ];
+  return [...createWelcomeLines(lastLoginAt)];
 }
 
 function appendText(
   lines: TerminalLine[],
   texts: string[],
-  type: "stdout" | "stderr" = "stdout",
+  type: "stdout" | "stderr" = "stdout"
 ) {
   const nextLines = [...lines];
 
@@ -85,177 +91,238 @@ function appendText(
   return nextLines;
 }
 
+function asArray(value?: string | string[]) {
+  if (!value) {
+    return [];
+  }
+
+  return Array.isArray(value) ? value : [value];
+}
+
+function normalizeCommandResult(result: CommandResult): CommandOutput {
+  if (!result) {
+    return {};
+  }
+
+  if (typeof result === "string" || Array.isArray(result)) {
+    return { stdout: result };
+  }
+
+  return result;
+}
+
 export function useTerminalSession({
   lastLoginAt,
-  onExit,
+  clientCommands = {},
+  serverCommands = {},
+  runServerCommand,
 }: UseTerminalSessionOptions = {}) {
   const [session, setSession] = useState<TerminalSessionState>({
     lines: createInitialLines(lastLoginAt),
     input: "",
-    mode: "text",
-    prompt: "{{username}}@{{hostname}}:~$",
-    pendingLoginUser: null,
+    history: [],
+    historyIndex: null,
   });
 
-  useEffect(() => {
-    setSession((current) => {
-      const nextLines = [...current.lines];
+  const lines = useMemo(() => {
+    if (
+      session.lines.length < 2 ||
+      session.lines[0]?.type !== "system" ||
+      session.lines[1]?.type !== "system"
+    ) {
+      return session.lines;
+    }
 
-      if (
-        nextLines.length < 2 ||
-        nextLines[0]?.type !== "system" ||
-        nextLines[1]?.type !== "system"
-      ) {
-        return current;
-      }
-
-      const welcomeLines = createWelcomeLines(lastLoginAt);
-      nextLines[0] = welcomeLines[0];
-      nextLines[1] = welcomeLines[1];
-
-      return {
-        ...current,
-        lines: nextLines,
-      };
-    });
-  }, [lastLoginAt]);
+    const welcomeLines = createWelcomeLines(lastLoginAt);
+    const nextLines = [...session.lines];
+    nextLines[0] = welcomeLines[0];
+    nextLines[1] = welcomeLines[1];
+    return nextLines;
+  }, [lastLoginAt, session.lines]);
 
   function setInput(input: string) {
-    setSession((current) => ({ ...current, input }));
+    setSession((current) => ({ ...current, input, historyIndex: null }));
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "l") {
+      event.preventDefault();
+      setSession((current) => ({
+        ...current,
+        lines: [],
+        input: "",
+        historyIndex: null,
+      }));
+      return;
+    }
+
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") {
+      event.preventDefault();
+      setSession((current) => {
+        const nextLines = [
+          ...current.lines,
+          {
+            id: createLineId("command"),
+            type: "command" as const,
+            prompt: "{{username}}@{{hostname}}:~$",
+            command: current.input,
+          },
+          {
+            id: createLineId("stdout"),
+            type: "stdout" as const,
+            text: "^C",
+          },
+        ];
+
+        return {
+          ...current,
+          lines: nextLines,
+          input: "",
+          historyIndex: null,
+        };
+      });
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSession((current) => {
+        if (current.history.length === 0) {
+          return current;
+        }
+
+        const nextIndex =
+          current.historyIndex === null
+            ? 0
+            : Math.min(current.historyIndex + 1, current.history.length - 1);
+
+        return {
+          ...current,
+          input: current.history[nextIndex] ?? "",
+          historyIndex: nextIndex,
+        };
+      });
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSession((current) => {
+        if (current.history.length === 0 || current.historyIndex === null) {
+          return current;
+        }
+
+        const nextIndex = current.historyIndex - 1;
+        return {
+          ...current,
+          input: nextIndex >= 0 ? (current.history[nextIndex] ?? "") : "",
+          historyIndex: nextIndex >= 0 ? nextIndex : null,
+        };
+      });
+    }
   }
 
   function submit(rawValue: string) {
     const value = rawValue.trim();
+    const commandLine: TerminalLine = {
+      id: createLineId("command"),
+      type: "command",
+      prompt: "{{username}}@{{hostname}}:~$",
+      command: rawValue,
+    };
 
-    if (session.mode === "password") {
-      setSession((current) => {
-        const nextLines: TerminalLine[] = [
-          ...current.lines,
-          {
-            id: createLineId("command"),
-            type: "command",
-            prompt: current.prompt,
-            command: rawValue,
-            hidden: true,
-          },
-        ];
-
-        if (!current.pendingLoginUser) {
-          return {
-            ...current,
-            lines: appendText(
-              nextLines,
-              ["login session error: missing username"],
-              "stderr",
-            ),
-            input: "",
-            mode: "text",
-            prompt: "{{username}}@{{hostname}}:~$",
-          };
-        }
-
-        return {
-          lines: appendText(nextLines, [
-            `Welcome, ${current.pendingLoginUser}. Authentication accepted.`,
-          ]),
-          input: "",
-          mode: "text",
-          prompt: "{{username}}@{{hostname}}:~$",
-          pendingLoginUser: null,
-        };
-      });
-
+    if (!value) {
+      setSession((current) => ({
+        ...current,
+        lines: [...current.lines, commandLine],
+        input: "",
+        historyIndex: null,
+      }));
       return;
     }
 
-    setSession((current) => {
-      const commandLine: TerminalLine = {
-        id: createLineId("command"),
-        type: "command",
-        prompt: current.prompt,
-        command: rawValue,
-      };
+    const [command, ...argv] = value.split(/\s+/);
+    const clientCommand = clientCommands[command];
+    const serverCommand = serverCommands[command];
 
-      if (!value) {
-        return {
-          ...current,
-          lines: [...current.lines, commandLine],
-          input: "",
-        };
-      }
+    setSession((current) => ({
+      ...current,
+      lines: [...current.lines, commandLine],
+      input: "",
+      history: [rawValue, ...current.history],
+      historyIndex: null,
+    }));
 
-      if (value === "clear") {
-        return {
-          ...current,
-          lines: [],
-          input: "",
-        };
-      }
+    const execute = (runner: () => CommandResult | Promise<CommandResult>) => {
+      Promise.resolve(runner())
+        .then((result) => {
+          const output = normalizeCommandResult(result);
+          setSession((current) => ({
+            ...current,
+            lines: appendText(
+              appendText(
+                output.clear ? [] : current.lines,
+                asArray(output.stdout)
+              ),
+              asArray(output.stderr),
+              "stderr"
+            ),
+          }));
+        })
+        .catch((error: unknown) => {
+          const message =
+            error instanceof Error ? error.message : "local command failed";
+          setSession((current) => ({
+            ...current,
+            lines: appendText(current.lines, [message], "stderr"),
+          }));
+        });
+    };
 
-      if (value === "help") {
-        return {
-          ...current,
-          lines: appendText([...current.lines, commandLine], helpLines),
-          input: "",
-        };
-      }
+    if (clientCommand) {
+      execute(() =>
+        clientCommand.fn({
+          command,
+          raw: value,
+          argv,
+        })
+      );
+      return;
+    }
 
-      if (value === "whoami") {
-        return {
-          ...current,
-          lines: appendText([...current.lines, commandLine], ["{{username}}"]),
-          input: "",
-        };
-      }
+    if (serverCommand) {
+      execute(() =>
+        serverCommand.fn({
+          command,
+          raw: value,
+          argv,
+        })
+      );
+      return;
+    }
 
-      if (value === "exit" || value === "logout") {
-        onExit?.();
-        return {
-          ...current,
-          lines: [...current.lines, commandLine],
-          input: "",
-        };
-      }
+    if (runServerCommand) {
+      execute(() => runServerCommand(value));
+      return;
+    }
 
-      if (value === "login") {
-        return {
-          lines: appendText([...current.lines, commandLine], ["Username:"]),
-          input: "",
-          mode: "text",
-          prompt: "username:",
-          pendingLoginUser: "__awaiting_username__",
-        };
-      }
-
-      if (current.pendingLoginUser === "__awaiting_username__") {
-        return {
-          ...current,
-          lines: [...current.lines, commandLine],
-          input: "",
-          mode: "password",
-          prompt: "password:",
-          pendingLoginUser: value,
-        };
-      }
-
-      return {
-        ...current,
-        lines: appendText(
-          [...current.lines, commandLine],
-          [`command not found: ${value}`],
-          "stderr",
-        ),
-        input: "",
-      };
-    });
+    setSession((current) => ({
+      ...current,
+      lines: appendText(
+        current.lines,
+        [`command not found: ${value}`],
+        "stderr"
+      ),
+    }));
   }
 
   return {
-    lines: session.lines,
+    lines,
     input: session.input,
-    mode: session.mode,
-    prompt: session.prompt,
+    mode: "text" as const,
+    prompt: "{{username}}@{{hostname}}:~$",
     setInput,
+    handleKeyDown,
     submit,
   };
 }

@@ -25,7 +25,6 @@ export default defineConfig([
     plugins: {
       prettier: prettierPlugin,
       "react-hooks": reactHooks,
-      "react-refresh": reactRefresh,
       "unused-imports": unusedImports,
     },
     rules: {

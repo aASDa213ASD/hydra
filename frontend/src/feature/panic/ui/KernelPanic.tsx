@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+function randInt(min: number, max: number): number {
+  const span = max - min + 1;
+  const value = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
+  return min + (value % span);
+}
+
+function randFloat(min: number, max: number): number {
+  const value = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
+  const unit = value / 0xffffffff;
+  return min + (max - min) * unit;
+}
+
 function randHex(len: number): string {
   const bytes = new Uint8Array(len / 2);
   crypto.getRandomValues(bytes);
@@ -11,13 +23,13 @@ function randHex(len: number): string {
 function addr(): string {
   // Generate a 16- or 12-byte-like address string to mimic kernel output
   const variants = [16, 14, 12];
-  const len = variants[Math.floor(Math.random() * variants.length)];
+  const len = variants[randInt(0, variants.length - 1)] ?? 16;
   return randHex(len);
 }
 
 function genCodeLine(): string {
   // Generate a random series of instruction bytes with one marked as the current IP
-  const count = 32 + Math.floor(Math.random() * 8); // 48..71 bytes
+  const count = 32 + randInt(0, 7); // 32..39 bytes
   const bytes = new Uint8Array(count);
   crypto.getRandomValues(bytes);
   const ipIndex = Math.min(count - 1, Math.max(0, Math.floor(count * 0.65)));
@@ -42,15 +54,15 @@ export default function KernelPanic({
   reason?: string;
 }) {
   const allLines = useMemo(() => {
-    const cpu = Math.floor(Math.random() * 8); // 0..7
-    const pid = 1000 + Math.floor(Math.random() * 9000);
+    const cpu = randInt(0, 7);
+    const pid = 1000 + randInt(0, 8999);
 
     // Build timestamps matching number of lines we will render
     const baseLinesCount = 44; // approximate number of lines below
-    let cur = 0.6 + Math.random() * 0.2;
+    let cur = randFloat(0.6, 0.8);
     const stamps: string[] = [];
     for (let i = 0; i < baseLinesCount; i++) {
-      cur += 0.00002 + Math.random() * 0.0002;
+      cur += randFloat(0.00002, 0.00022);
       const s = cur.toFixed(6);
       stamps.push(`[${s.padStart(12, " ")}]`);
     }
@@ -115,20 +127,20 @@ export default function KernelPanic({
               return nv;
             });
           },
-          Math.max(10, delayMs),
+          Math.max(10, delayMs)
         );
       },
-      Math.max(0, startDelayMs),
+      Math.max(0, startDelayMs)
     );
     return () => {
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
       if (intervalRef.current) window.clearInterval(intervalRef.current);
     };
-  }, [allLines.length, delayMs, startDelayMs]);
+  }, [allLines.length, delayMs, onDone, startDelayMs]);
 
   const displayedText = useMemo(
     () => allLines.slice(0, visible).join("\n"),
-    [allLines, visible],
+    [allLines, visible]
   );
 
   return (

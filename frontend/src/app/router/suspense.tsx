@@ -3,7 +3,6 @@ import {
   Suspense,
   type ReactNode,
   useEffect,
-  useRef,
   useState,
   useCallback,
 } from "react";
@@ -139,32 +138,27 @@ function RouteSuspenseListener({ onChange }: SuspenseListenerProps) {
 
 export function LoaderRoute({ children }: RouteSuspenseProps) {
   const location = useLocation();
-  const lastPathname = useRef(location.pathname);
-  const [waitingForDelay, setWaitingForDelay] = useState(true);
+  const [settledPathname, setSettledPathname] = useState(location.pathname);
   const [suspensePending, setSuspensePending] = useState(false);
-  const suspenseFallbackActive = useRef(false);
+  const waitingForDelay = settledPathname !== location.pathname;
 
-  const shouldShowFallback =
-    lastPathname.current !== location.pathname || waitingForDelay;
-  const showLoader = shouldShowFallback || suspensePending;
+  const showLoader = waitingForDelay || suspensePending;
 
   const handleSuspenseChange = useCallback((pending: boolean) => {
-    suspenseFallbackActive.current = pending;
     setSuspensePending(pending);
   }, []);
 
   useEffect(() => {
-    setWaitingForDelay(true);
-    const timer = setTimeout(() => setWaitingForDelay(false), FORCE_LOADING_MS);
-    lastPathname.current = location.pathname;
-    return () => clearTimeout(timer);
-  }, [location.pathname]);
-
-  useEffect(() => {
-    if (!shouldShowFallback && !suspenseFallbackActive.current) {
-      setSuspensePending(false);
+    if (settledPathname === location.pathname) {
+      return;
     }
-  }, [shouldShowFallback]);
+
+    const timer = setTimeout(
+      () => setSettledPathname(location.pathname),
+      FORCE_LOADING_MS
+    );
+    return () => clearTimeout(timer);
+  }, [location.pathname, settledPathname]);
 
   return (
     <>
