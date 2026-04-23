@@ -73,6 +73,17 @@ export default function ChannelPage() {
     initialLines: [],
     serverCommands,
   });
+  const {
+    appendLine,
+    appendStderr,
+    appendStdout,
+    lines,
+    input,
+    setInput,
+    submit,
+    prompt,
+    handleKeyDown,
+  } = session;
 
   useEffect(() => {
     if (!token || !channel) {
@@ -99,7 +110,7 @@ export default function ChannelPage() {
               return;
             }
 
-            session.appendLine({
+            appendLine({
               id: `bootstrap-${Date.now()}-${index}-${Math.random()
                 .toString(36)
                 .slice(2, 6)}`,
@@ -111,23 +122,23 @@ export default function ChannelPage() {
         }
 
         if (event.op === "left") {
-          session.appendStdout(`left ${event.channel}`);
+          appendStdout(`left ${event.channel}`);
           return;
         }
 
         if (event.op === "join_notice") {
-          session.appendStdout(event.text);
+          appendStdout(event.text);
           return;
         }
 
         if (event.op === "leave_notice") {
-          session.appendStdout(event.text);
+          appendStdout(event.text);
           return;
         }
 
         if (event.op === "message") {
           const isSelf = event.from === (user?.name ?? "");
-          session.appendLine({
+          appendLine({
             id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             type: "stdout",
             text: "",
@@ -148,7 +159,7 @@ export default function ChannelPage() {
         }
 
         if (event.op === "error") {
-          session.appendStderr(`ws error: ${event.error}`);
+          appendStderr(`ws error: ${event.error}`);
         }
       },
     });
@@ -162,11 +173,11 @@ export default function ChannelPage() {
         wsClientRef.current = null;
       }
     };
-  }, [channel, session.appendLine, session.appendStderr, token, user?.name]);
+  }, [appendLine, appendStderr, appendStdout, channel, token, user?.name]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ block: "end" });
-  }, [session.lines]);
+  }, [lines]);
 
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -179,7 +190,7 @@ export default function ChannelPage() {
   const submitChannelInput = (rawValue: string) => {
     const text = rawValue.trim();
     if (!text) {
-      session.submit(rawValue);
+      submit(rawValue);
       return;
     }
 
@@ -189,7 +200,7 @@ export default function ChannelPage() {
       text === "leave" ||
       text === "exit";
     if (isCommand) {
-      session.submit(text.startsWith("/") ? text.slice(1) : text);
+      submit(text.startsWith("/") ? text.slice(1) : text);
       return;
     }
 
@@ -198,25 +209,25 @@ export default function ChannelPage() {
       channel,
       text,
     });
-    session.setInput("");
+    setInput("");
     setCaretIndex(0);
   };
 
   const syncCaretIndex = () => {
-    const input = inputRef.current;
-    if (!input) {
+    const inputElement = inputRef.current;
+    if (!inputElement) {
       return;
     }
 
-    const index = input.selectionStart ?? session.input.length;
-    setCaretIndex(Math.max(0, Math.min(index, session.input.length)));
+    const index = inputElement.selectionStart ?? input.length;
+    setCaretIndex(Math.max(0, Math.min(index, input.length)));
   };
 
   return (
     <CLILayout>
       <div className="flex h-screen max-h-screen flex-col overflow-hidden bg-black font-mono text-white">
         <div className="flex-1 overflow-y-auto px-6 py-6 whitespace-pre-wrap break-words">
-          {session.lines.map((line) => {
+          {lines.map((line) => {
             if (line.type === "stderr") {
               return (
                 <p key={line.id} className="m-0">
@@ -263,12 +274,12 @@ export default function ChannelPage() {
           className="shrink-0 bg-black px-6 pb-3 text-white"
           onSubmit={(event) => {
             event.preventDefault();
-            submitChannelInput(session.input);
+            submitChannelInput(input);
           }}
           onClick={() => inputRef.current?.focus()}
         >
           <div className="flex items-center gap-2">
-            <span className="shrink-0">{session.prompt}</span>
+            <span className="shrink-0">{prompt}</span>
             <div
               className="relative min-w-0 flex-1"
               onClick={() => inputRef.current?.focus()}
@@ -280,24 +291,24 @@ export default function ChannelPage() {
                   </>
                 ) : (
                   <>
-                    {session.input.slice(0, caretIndex)}
+                    {input.slice(0, caretIndex)}
                     <span className="inline-block h-[1em] w-[1ch] -mr-[1ch] align-middle bg-current opacity-70 mix-blend-difference animate-[caret-blink_1.0s_cubic-bezier(0,0,1,1)_infinite]" />
-                    {session.input.slice(caretIndex)}
+                    {input.slice(caretIndex)}
                   </>
                 )}
               </pre>
               <input
                 ref={inputRef}
-                value={session.input}
+                value={input}
                 onChange={(event) => {
-                  session.setInput(event.target.value);
+                  setInput(event.target.value);
                   const index = event.target.selectionStart ?? 0;
                   setCaretIndex(
                     Math.max(0, Math.min(index, event.target.value.length))
                   );
                 }}
                 onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
-                  session.handleKeyDown(event);
+                  handleKeyDown(event);
                 }}
                 onKeyUp={syncCaretIndex}
                 onClick={syncCaretIndex}

@@ -54,8 +54,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             clearSession();
           }, 500);
         });
-    } else {
-      setIsLoading(false);
     }
 
     return () => {
