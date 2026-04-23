@@ -24,6 +24,7 @@ type TerminalSessionState = {
   input: string;
   history: string[];
   historyIndex: number | null;
+  isExecuting: boolean;
 };
 
 type UseTerminalSessionOptions = {
@@ -122,6 +123,7 @@ export function useTerminalSession({
     input: "",
     history: [],
     historyIndex: null,
+    isExecuting: false,
   });
 
   const lines = useMemo(() => {
@@ -254,11 +256,13 @@ export function useTerminalSession({
     }));
 
     const execute = (runner: () => CommandResult | Promise<CommandResult>) => {
+      setSession((current) => ({ ...current, isExecuting: true }));
       Promise.resolve(runner())
         .then((result) => {
           const output = normalizeCommandResult(result);
           setSession((current) => ({
             ...current,
+            isExecuting: false,
             lines: appendText(
               appendText(
                 output.clear ? [] : current.lines,
@@ -274,6 +278,7 @@ export function useTerminalSession({
             error instanceof Error ? error.message : "local command failed";
           setSession((current) => ({
             ...current,
+            isExecuting: false,
             lines: appendText(current.lines, [message], "stderr"),
           }));
         });
@@ -320,6 +325,7 @@ export function useTerminalSession({
     lines,
     input: session.input,
     mode: "text" as const,
+    showInput: !session.isExecuting,
     prompt: "{{username}}@{{hostname}}:~$",
     setInput,
     handleKeyDown,

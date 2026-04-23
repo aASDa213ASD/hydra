@@ -119,10 +119,10 @@ export function Terminal({
   }
 
   useEffect(() => {
-    if (autoFocus && !disabled) {
+    if (autoFocus && !disabled && showInput) {
       inputRef.current?.focus();
     }
-  }, [autoFocus, disabled]);
+  }, [autoFocus, disabled, showInput]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });

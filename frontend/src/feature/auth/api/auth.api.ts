@@ -1,4 +1,5 @@
 import { apiUrl } from "@/shared/lib/backend-url";
+import type { User } from "@/feature/user/types/user";
 
 type LoginResponse = {
   token: string;
@@ -25,6 +26,29 @@ export async function loginWithPassword(
       "error" in data && typeof data.error === "string"
         ? data.error
         : "LOGIN_FAILED"
+    );
+  }
+
+  return data;
+}
+
+export async function renameUser(token: string, name: string): Promise<User> {
+  const res = await fetch(apiUrl("/api/v1/me/rename"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ name }),
+  });
+
+  const data = (await res.json()) as User | ApiErrorResponse;
+
+  if (!res.ok || !("name" in data) || typeof data.name !== "string") {
+    throw new Error(
+      "error" in data && typeof data.error === "string"
+        ? data.error
+        : "RENAME_FAILED"
     );
   }
 
