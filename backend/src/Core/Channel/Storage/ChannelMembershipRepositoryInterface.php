@@ -16,5 +16,6 @@ interface ChannelMembershipRepositoryInterface
 
     public function countByChannel(Channel $channel): int;
 
+    /** @return list<Channel> */
     public function findChannelsByUser(User $user): array;
 }

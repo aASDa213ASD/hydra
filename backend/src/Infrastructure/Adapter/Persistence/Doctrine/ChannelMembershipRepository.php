@@ -43,10 +43,12 @@ final class ChannelMembershipRepository extends ServiceEntityRepository implemen
             ->getSingleScalarResult();
     }
 
+    /** @return list<Channel> */
     public function findChannelsByUser(User $user): array
     {
         $memberships = $this->findBy(['user' => $user]);
 
+        /** @var list<Channel> $channels */
         $channels = [];
         foreach ($memberships as $membership) {
             if ($membership instanceof ChannelMembership && $membership->channel !== null) {

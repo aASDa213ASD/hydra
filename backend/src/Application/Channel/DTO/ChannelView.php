@@ -17,6 +17,7 @@ final readonly class ChannelView
         return new self(name: '#' . $channel->name);
     }
 
+    /** @return array{name: string} */
     public function toArray(): array
     {
         return [

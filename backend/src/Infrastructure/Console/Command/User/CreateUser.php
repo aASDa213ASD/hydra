@@ -44,9 +44,13 @@ final class CreateUser extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $username = trim((string) $input->getArgument('username'));
-        $plain_password = (string) $input->getArgument('password');
-        $role_value = strtoupper(trim((string) $input->getArgument('role')));
+        $username_argument = $input->getArgument('username');
+        $password_argument = $input->getArgument('password');
+        $role_argument = $input->getArgument('role');
+
+        $username = is_string($username_argument) ? trim($username_argument) : '';
+        $plain_password = is_string($password_argument) ? $password_argument : '';
+        $role_value = is_string($role_argument) ? strtoupper(trim($role_argument)) : '';
 
         if ($username === '') {
             $io->error('Username can not be empty.');

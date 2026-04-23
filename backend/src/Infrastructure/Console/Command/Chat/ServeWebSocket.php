@@ -53,9 +53,13 @@ final class ServeWebSocket extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $host = (string) $input->getOption('host');
-        $port = (int) $input->getOption('port');
-        $auth_timeout = (int) $input->getOption('auth-timeout');
+        $host_option = $input->getOption('host');
+        $port_option = $input->getOption('port');
+        $auth_timeout_option = $input->getOption('auth-timeout');
+
+        $host = is_string($host_option) && $host_option !== '' ? $host_option : '0.0.0.0';
+        $port = is_numeric($port_option) ? (int) $port_option : 8081;
+        $auth_timeout = is_numeric($auth_timeout_option) ? (int) $auth_timeout_option : 10;
 
         $server = @stream_socket_server("tcp://{$host}:{$port}", $errno, $errstr);
         if ($server === false) {
@@ -65,7 +69,7 @@ final class ServeWebSocket extends Command
         stream_set_blocking($server, false);
         $output->writeln("<info>WS server listening on {$host}:{$port}</info>");
 
-        while (true) {
+        for (;;) {
             $read = [$server];
             foreach ($this->clients as $client) {
                 $read[] = $client['stream'];
@@ -190,6 +194,7 @@ final class ServeWebSocket extends Command
         return null;
     }
 
+    /** @return array<string, mixed>|null */
     private function decodeFrame(string $data): ?array
     {
         $len = ord($data[1] ?? "\x00") & 127;
@@ -222,6 +227,7 @@ final class ServeWebSocket extends Command
         return is_array($json) ? $json : null;
     }
 
+    /** @param array<string, mixed> $payload */
     private function encodeFrame(array $payload): string
     {
         $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -241,6 +247,7 @@ final class ServeWebSocket extends Command
         return chr(0x81) . chr(127) . pack('J', $len) . $json;
     }
 
+    /** @param array<string, mixed> $payload */
     private function handleClientMessage(int $client_id, array $payload): void
     {
         $op = $payload['op'] ?? null;
@@ -405,10 +412,6 @@ final class ServeWebSocket extends Command
             return null;
         }
 
-        if (!is_array($payload)) {
-            return null;
-        }
-
         $uid = $payload['uid'] ?? null;
         if (!is_int($uid) && !is_string($uid)) {
             return null;
@@ -417,6 +420,7 @@ final class ServeWebSocket extends Command
         return $this->users->findById((int) $uid);
     }
 
+    /** @param array<string, mixed> $payload */
     private function send(int $client_id, array $payload): void
     {
         $stream = $this->clients[$client_id]['stream'] ?? null;
