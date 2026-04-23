@@ -1,6 +1,7 @@
 import {
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
   useEffect,
   useRef,
   useState,
@@ -13,11 +14,15 @@ export type TerminalLine =
       id: string;
       type: "system" | "stdout";
       text: string;
+      className?: string;
+      content?: ReactNode;
     }
   | {
       id: string;
       type: "stderr";
       text: string;
+      className?: string;
+      content?: ReactNode;
     }
   | {
       id: string;
@@ -25,6 +30,7 @@ export type TerminalLine =
       prompt: string;
       command: string;
       hidden?: boolean;
+      className?: string;
     };
 
 type TerminalProps = {
@@ -63,7 +69,7 @@ function renderLine(
 ) {
   if (line.type === "command") {
     return (
-      <p key={line.id} className="m-0 break-words">
+      <p key={line.id} className={cn("m-0 break-words", line.className)}>
         <span>{replacePlaceholders(line.prompt, replacements)}</span>{" "}
         <span>
           {line.hidden ? "" : replacePlaceholders(line.command, replacements)}
@@ -74,15 +80,15 @@ function renderLine(
 
   if (line.type === "stderr") {
     return (
-      <p key={line.id} className="m-0 break-words text-red-500">
-        {replacePlaceholders(line.text, replacements)}
+      <p key={line.id} className={cn("m-0 break-words", line.className)}>
+        {line.content ?? replacePlaceholders(line.text, replacements)}
       </p>
     );
   }
 
   return (
-    <p key={line.id} className="m-0 break-words">
-      {replacePlaceholders(line.text, replacements)}
+    <p key={line.id} className={cn("m-0 break-words", line.className)}>
+      {line.content ?? replacePlaceholders(line.text, replacements)}
     </p>
   );
 }
@@ -147,7 +153,7 @@ export function Terminal({
       onClick={() => inputRef.current?.focus()}
       aria-label="Terminal"
     >
-      <div className="flex flex-col gap-1 whitespace-pre-wrap">
+      <div className="flex flex-col whitespace-pre-wrap">
         {lines.map((line) => renderLine(line, { username, hostname }))}
 
         {showInput ? (

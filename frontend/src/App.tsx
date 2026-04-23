@@ -1,5 +1,9 @@
 import { Terminal } from "@/shared/components/terminal";
-import { renameUser } from "@/feature/auth/api/auth.api";
+import {
+  channelCreate,
+  channelJoin,
+  renameUser,
+} from "@/feature/auth/api/auth.api";
 import { useAuth } from "@/feature/auth/hooks/use-auth";
 import {
   type CommandDef,
@@ -17,6 +21,19 @@ function App() {
   const { user, token, refreshUser } = useAuth();
   const navigate = useNavigate();
   const serverCommands: Record<string, CommandDef> = useMemo(() => {
+    const parseChannelName = (argv: string[]) => {
+      if (argv.length !== 2) {
+        throw new Error("usage: channel <create|join> #<name>");
+      }
+
+      const name = argv[1]?.trim() ?? "";
+      if (!name.startsWith("#")) {
+        throw new Error("channel name must start with #");
+      }
+
+      return name;
+    };
+
     return {
       whoami: {
         usage: "whoami          print effective user name",
@@ -57,6 +74,31 @@ function App() {
           await refreshUser();
 
           return `renamed to ${renamedUser.name}`;
+        },
+      },
+      channel: {
+        usage: "channel         manage channels (create/join)",
+        fn: async ({ argv }) => {
+          if (!token) {
+            throw new Error("not authenticated");
+          }
+
+          const subcommand = argv[0] ?? "";
+          if (subcommand !== "create" && subcommand !== "join") {
+            throw new Error("usage: channel <create|join> #<name>");
+          }
+
+          const channelName = parseChannelName(argv);
+
+          if (subcommand === "create") {
+            const created = await channelCreate(token, channelName);
+            navigate(`/channel/${created.channel.name.slice(1)}`);
+            return `created ${created.channel.name}`;
+          }
+
+          const joined = await channelJoin(token, channelName);
+          navigate(`/channel/${joined.channel.name.slice(1)}`);
+          return `joined ${joined.channel.name}`;
         },
       },
       exit: {

@@ -17,12 +17,14 @@ services:
     ports:
       - "9000:9000" # php-fpm
       - "8000:8080" # nginx
+      - "8081:8081" # websocket
     user: "${UID:-1000}:${GID:-1000}"
     command: >
       sh -c "
         set -e
         cd /var/www/html
         mkdir -p var public/data config/jwt
+        php bin/console app:chat:ws --host=0.0.0.0 --port=8081 &
         php-fpm -R &
         nginx -g 'daemon off;'
       "

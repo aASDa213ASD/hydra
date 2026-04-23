@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useMemo, useState } from "react";
+import { type KeyboardEvent, useCallback, useMemo, useState } from "react";
 
 import { type TerminalLine } from "@/shared/components/terminal";
 
@@ -29,6 +29,8 @@ type TerminalSessionState = {
 
 type UseTerminalSessionOptions = {
   lastLoginAt?: string;
+  prompt?: string;
+  initialLines?: TerminalLine[];
   clientCommands?: Record<string, CommandDef>;
   serverCommands?: Record<string, CommandDef>;
   runServerCommand?: (raw: string) => CommandResult | Promise<CommandResult>;
@@ -114,12 +116,14 @@ function normalizeCommandResult(result: CommandResult): CommandOutput {
 
 export function useTerminalSession({
   lastLoginAt,
+  prompt = "{{username}}@{{hostname}}:~$",
+  initialLines,
   clientCommands = {},
   serverCommands = {},
   runServerCommand,
 }: UseTerminalSessionOptions = {}) {
   const [session, setSession] = useState<TerminalSessionState>({
-    lines: createInitialLines(lastLoginAt),
+    lines: initialLines ?? createInitialLines(lastLoginAt),
     input: "",
     history: [],
     historyIndex: null,
@@ -127,6 +131,10 @@ export function useTerminalSession({
   });
 
   const lines = useMemo(() => {
+    if (initialLines) {
+      return session.lines;
+    }
+
     if (
       session.lines.length < 2 ||
       session.lines[0]?.type !== "system" ||
@@ -140,7 +148,7 @@ export function useTerminalSession({
     nextLines[0] = welcomeLines[0];
     nextLines[1] = welcomeLines[1];
     return nextLines;
-  }, [lastLoginAt, session.lines]);
+  }, [initialLines, lastLoginAt, session.lines]);
 
   function setInput(input: string) {
     setSession((current) => ({ ...current, input, historyIndex: null }));
@@ -166,7 +174,7 @@ export function useTerminalSession({
           {
             id: createLineId("command"),
             type: "command" as const,
-            prompt: "{{username}}@{{hostname}}:~$",
+            prompt,
             command: current.input,
           },
           {
@@ -229,7 +237,7 @@ export function useTerminalSession({
     const commandLine: TerminalLine = {
       id: createLineId("command"),
       type: "command",
-      prompt: "{{username}}@{{hostname}}:~$",
+      prompt,
       command: rawValue,
     };
 
@@ -313,22 +321,42 @@ export function useTerminalSession({
 
     setSession((current) => ({
       ...current,
-      lines: appendText(
-        current.lines,
-        [`command not found: ${value}`],
-        "stderr"
-      ),
+      lines: appendText(current.lines, [`${value}: unrecognized`], "stderr"),
     }));
   }
+
+  const appendStdout = useCallback((text: string | string[]) => {
+    setSession((current) => ({
+      ...current,
+      lines: appendText(current.lines, asArray(text), "stdout"),
+    }));
+  }, []);
+
+  const appendStderr = useCallback((text: string | string[]) => {
+    setSession((current) => ({
+      ...current,
+      lines: appendText(current.lines, asArray(text), "stderr"),
+    }));
+  }, []);
+
+  const appendLine = useCallback((line: TerminalLine) => {
+    setSession((current) => ({
+      ...current,
+      lines: [...current.lines, line],
+    }));
+  }, []);
 
   return {
     lines,
     input: session.input,
     mode: "text" as const,
     showInput: !session.isExecuting,
-    prompt: "{{username}}@{{hostname}}:~$",
+    prompt,
     setInput,
     handleKeyDown,
     submit,
+    appendStdout,
+    appendStderr,
+    appendLine,
   };
 }

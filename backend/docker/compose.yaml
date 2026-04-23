@@ -13,6 +13,7 @@ services:
       APP_DEBUG: 0
     ports:
       - "8000:8080"
+      - "8081:8081"
     volumes:
       - var:/var/www/html/var
       - jwt:/var/www/html/config/jwt
@@ -25,6 +26,14 @@ services:
     networks:
       - hydra_internal
     restart: unless-stopped
+    command: >
+      sh -c "
+        set -e
+        cd /var/www/html
+        php bin/console app:chat:ws --host=0.0.0.0 --port=8081 &
+        php-fpm -R &
+        nginx -g 'daemon off;'
+      "
 
 volumes:
   var: {}

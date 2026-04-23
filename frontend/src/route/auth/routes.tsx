@@ -4,6 +4,7 @@ import { SilentSuspense } from "@/app/router/suspense";
 import { AuthRoute } from "@/app/router/guards";
 
 const TerminalPage = lazy(() => import("@/App"));
+const ChannelPage = lazy(() => import("@/route/channel/page"));
 const LoginPage = lazy(() => import("@/route/auth/login/page"));
 const LogoutPage = lazy(() => import("@/route/auth/logout/page"));
 
@@ -23,6 +24,16 @@ export const authRoutes: RouteObject[] = [
     element: (
       <SilentSuspense>
         <LoginPage />
+      </SilentSuspense>
+    ),
+  },
+  {
+    path: "/channel/:id",
+    element: (
+      <SilentSuspense>
+        <AuthRoute>
+          <ChannelPage />
+        </AuthRoute>
       </SilentSuspense>
     ),
   },

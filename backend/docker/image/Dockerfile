@@ -95,7 +95,7 @@ COPY --from=deps /var/www/html ${APP_DIR}
 COPY docker/config/nginx/nginx.main.conf /etc/nginx/nginx.conf
 COPY docker/config/nginx/nginx.conf /etc/nginx/http.d/default.conf
 
-EXPOSE 8080 9000
+EXPOSE 8080 8081 9000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -f http://127.0.0.1:8080/healthz || exit 1
 
 USER app
@@ -113,5 +113,5 @@ RUN echo "opcache.enable=0" > /usr/local/etc/php/conf.d/opcache.ini
 COPY docker/config/nginx/nginx.main.conf /etc/nginx/nginx.conf
 COPY docker/config/nginx/nginx.conf /etc/nginx/http.d/default.conf
 
-EXPOSE 8080 9000
+EXPOSE 8080 8081 9000
 CMD ["sh", "-c", "php-fpm -R & nginx -g 'daemon off;'"]
